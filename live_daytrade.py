@@ -69,6 +69,17 @@ def get_clients():
             "ALPACA_API_KEY / ALPACA_SECRET_KEY manquantes. "
             "Copie .env.example en .env et renseigne tes clés PAPER Alpaca."
         )
+    problems = []
+    for name, value in (("ALPACA_API_KEY", API_KEY), ("ALPACA_SECRET_KEY", SECRET_KEY)):
+        # diagnostic SANS jamais afficher la clé elle-même
+        if any(ch.isspace() for ch in value) or "=" in value or '"' in value:
+            problems.append(
+                f"{name} est mal collée : {len(value)} caractères, {value.count(chr(10)) + 1} ligne(s), "
+                f"contient '=' : {'oui' if '=' in value else 'non'}, espaces : {'oui' if ' ' in value else 'non'}. "
+                f"Le secret doit contenir UNIQUEMENT la clé, sur une seule ligne, sans 'NOM='."
+            )
+    if problems:
+        raise RuntimeError("\n".join(problems))
     return (
         TradingClient(api_key=API_KEY, secret_key=SECRET_KEY, paper=True),
         StockHistoricalDataClient(api_key=API_KEY, secret_key=SECRET_KEY),
