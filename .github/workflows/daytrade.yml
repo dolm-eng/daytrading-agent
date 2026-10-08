@@ -1,0 +1,75 @@
+name: Day trading (paper)
+
+# Heures en UTC. Elles marchent été comme hiver : le bot attend lui-même
+# l'ouverture et l'heure de fermeture grâce à l'horloge du marché d'Alpaca.
+#   matin : 13h20 UTC -> attend l'ouverture (9h30 NY), trade jusqu'à 11h35 NY
+#   soir  : 19h07 UTC -> attend 15h50 NY, ferme tout, envoie le bilan
+# Un job GitHub est limité à 6 h, d'où ce découpage en deux.
+on:
+  schedule:
+    - cron: "20 13 * * 1-5"
+    - cron: "7 19 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: "morning / close / all"
+        default: "morning"
+      dry_run:
+        description: "true = aucun ordre envoyé (test)"
+        default: "true"
+
+permissions:
+  contents: write   # pour enregistrer journal/journal.csv
+
+concurrency:
+  group: daytrade-${{ github.event.schedule || inputs.phase }}
+  cancel-in-progress: false
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Lancer le bot
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PHASE="${{ inputs.phase }}"
+            [ "${{ inputs.dry_run }}" = "true" ] && EXTRA="--dry-run"
+          elif [ "${{ github.event.schedule }}" = "20 13 * * 1-5" ]; then
+            PHASE=morning
+          else
+            PHASE=close
+          fi
+          python live_daytrade.py --phase "$PHASE" $EXTRA
+
+      # Enregistre le journal dans le dépôt. Bonus : cette activité régulière
+      # empêche GitHub de désactiver les tâches planifiées (il le fait au bout
+      # de 60 jours sans activité sur un dépôt public).
+      - name: Enregistrer le journal
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain journal)" ]; then
+            git config user.name "daytrading-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add journal
+            git commit -m "Journal $(date -u +%F)"
+            git push
+          fi

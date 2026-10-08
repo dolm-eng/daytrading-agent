@@ -1,0 +1,8 @@
+yfinance>=0.2.40
+pandas==2.2.3   # pandas 3.x : une DLL est bloquee par Smart App Control sur ce PC
+numpy>=1.24
+alpaca-py>=0.30
+matplotlib>=3.8
+python-dotenv>=1.0
+tzdata>=2024.1
+pytest>=8.0

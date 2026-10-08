@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+venv/
+.venv/
+logs/
+equity_curve.png
+trades.csv
+data_cache/
+research/*.out
