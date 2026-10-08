@@ -44,8 +44,8 @@ import strategy
 
 load_dotenv()
 
-API_KEY = os.getenv("ALPACA_API_KEY")
-SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+API_KEY = (os.getenv("ALPACA_API_KEY") or "").strip()  # strip : un copier-coller ajoute souvent un retour à la ligne
+SECRET_KEY = (os.getenv("ALPACA_SECRET_KEY") or "").strip()
 MAX_WAIT_FOR_OPEN = timedelta(hours=3)
 NY = ZoneInfo(config.MARKET_TZ)
 

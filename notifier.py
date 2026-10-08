@@ -19,7 +19,7 @@ def _clean_env(name: str, default: str | None = None) -> str | None:
     utile car GitHub Actions transmet un secret non défini comme une chaîne
     vide plutôt que de ne pas la définir du tout, ce qui casserait int()
     ci-dessous si on utilisait juste os.getenv(name, default)."""
-    value = os.getenv(name)
+    value = (os.getenv(name) or "").strip()
     return value if value else default
 
 
