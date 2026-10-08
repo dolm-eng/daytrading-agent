@@ -39,7 +39,10 @@ sur le PC de l'utilisateur (DLL `nattype`). Sous Windows, définir
   max DD -9,5 %. ~+5,9 % brut avant ~9 600 $ de slippage estimé -> pas
   d'edge net démontré. Long et short tous deux légèrement négatifs.
 - `.env` configuré (compte paper dédié, 100 000 $, via `configurer_cles.bat`).
-  Connexion et lecture des bougies IEX live vérifiées ; pas encore de séance live.
+  Connexion et lecture des bougies IEX live vérifiées.
+- 2026-10-09 : dépôt public github.com/dolm-eng/daytrading-agent, secrets
+  configurés, test workflow_dispatch (dry-run) vert. Tâche planifiée Windows
+  supprimée. Première séance live prévue le 2026-10-09 (stratégie ORB 6 actions).
 
 ## Exécution
 
@@ -53,5 +56,7 @@ La tâche planifiée Windows locale ne doit PAS tourner en même temps.
 Protocole : DEV 2020-10 -> 2024-12, HOLDOUT 2025-01 -> 2026-10 (déjà
 consommé pour "zone de bruit"). Zone de bruit SPY+QQQ (coût 1 bp) :
 DEV Sharpe 1,35 / +9 %/an ; HOLDOUT Sharpe 0,17 / +0,9 %/an. Aucune
-stratégie n'a d'edge prouvé. Le paper trading oct. 2026 -> janv. 2027 est
+stratégie n'a d'edge prouvé. Variantes ORB sur DEV (coût 2 bp) : seule
+"ORB15 SPY+QQQ" est positive (Sharpe 0,80, +2,2 %/an, DD 2,6 %) ; les autres
+perdent. Piste : se limiter à SPY+QQQ. Le paper trading oct. 2026 -> janv. 2027 est
 le seul test propre restant.
