@@ -60,3 +60,8 @@ stratégie n'a d'edge prouvé. Variantes ORB sur DEV (coût 2 bp) : seule
 "ORB15 SPY+QQQ" est positive (Sharpe 0,80, +2,2 %/an, DD 2,6 %) ; les autres
 perdent. Piste : se limiter à SPY+QQQ. Le paper trading oct. 2026 -> janv. 2027 est
 le seul test propre restant.
+- Stocks in play (research/PROTOCOLE_STOCKS_IN_PLAY.md, 300 actions, exécution
+  1 min) : avantage brut réel (Sharpe ~1,5 à 1 bp, DEV et HOLDOUT) mais point
+  mort ~2,6-2,9 bp/exécution ; ÉCHEC au critère pré-enregistré (3 bp). Non
+  déployé. HOLDOUT désormais consommé : toute nouvelle variante se valide en
+  paper trading. Données en cache : data_cache/sip5m (946 Mo), sip1m.
