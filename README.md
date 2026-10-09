@@ -18,7 +18,33 @@ journée**. Rien n'est gardé pendant la nuit.
   backtest sur 2 ans via Alpaca (voir plus bas), à faire avant toute chose.
 - Ce n'est ni un système de gains garantis, ni un conseil financier.
 
-## La stratégie : cassure du range d'ouverture (ORB)
+## Stratégie active : « stocks in play » (EXPÉRIENCE de mesure)
+
+Depuis le 9 octobre 2026, le bot tourne en mode **stocks in play**
+(`STRATEGY` dans `config.py`) :
+
+1. À 9h35 New York (15h35 Paris), il scanne **300 actions liquides** et
+   garde les **20 plus « en jeu »** : celles dont la 1re bougie de 5 minutes
+   a un volume anormalement élevé (souvent une vraie nouvelle).
+2. Bougie haussière -> ordre d'achat qui se déclenche si le prix dépasse
+   son plus haut ; baissière -> vente à découvert sous son plus bas.
+3. Stop-loss serré (10 % de la volatilité quotidienne), attaché à l'ordre
+   chez Alpaca. Tout est fermé à 15h50 New York.
+4. Chaque position vaut au plus 1/20 du capital : jamais d'effet de levier.
+
+**Ce n'est pas une stratégie validée.** Backtest sur 300 actions (2020-2026,
+exécution minute par minute, `research/PROTOCOLE_STOCKS_IN_PLAY.md`) : elle
+gagne avant frais (Sharpe ~1,5-2), mais devient perdante si chaque
+exécution coûte plus de ~0,027 % (2,7 points de base). Le bot **mesure les
+vrais frais** de chaque exécution dans `journal/executions.csv` et les
+résume dans l'email du soir. C'est l'objet de l'expérience jusqu'en janvier.
+
+Pour voir la sélection qu'il aurait faite un jour donné :
+`python live_daytrade.py --replay 2026-10-08`.
+
+Pour revenir à l'ancienne stratégie : `STRATEGY = "orb"` dans `config.py`.
+
+## Ancienne stratégie : cassure du range d'ouverture (ORB)
 
 1. On note le **plus haut** et le **plus bas** des 15 premières minutes de la
    séance (9h30-9h45 New York = 15h30-15h45 Paris). C'est le *range

@@ -11,8 +11,9 @@ Dépôt PUBLIC : n'y écrire aucune information personnelle ni aucune clé.
   réel sans demande explicite et informée.
 - Jamais de position overnight : fermeture `FLATTEN_MINUTES_BEFORE_CLOSE`
   avant la clôture, en backtest comme en live.
-- `strategy.evaluate_entry` est la SEULE source de décision, partagée par le
-  backtest et le live. Elle ne doit voir que des bougies terminées.
+- ORB : `strategy.evaluate_entry` est la SEULE source de décision, partagée par
+  le backtest et le live. Stocks in play : `sip_strategy.select` (même logique
+  que research/stocks_in_play.py). Ne voir que des bougies terminées.
 - Backtest : exécution à l'ouverture de la bougie suivante, stop avant
   objectif si les deux sont touchés. Le test `test_random_walk_is_not_profitable`
   sert de détecteur de lookahead : il doit rester vert.
@@ -65,3 +66,8 @@ le seul test propre restant.
   mort ~2,6-2,9 bp/exécution ; ÉCHEC au critère pré-enregistré (3 bp). Non
   déployé. HOLDOUT désormais consommé : toute nouvelle variante se valide en
   paper trading. Données en cache : data_cache/sip5m (946 Mo), sip1m.
+- 2026-10-09 : STRATEGY = "stocks_in_play" activée comme EXPÉRIENCE de mesure
+  des coûts (live_sip.py : ordres STOP OTO à 9h35 NY, sélection sur 1re
+  bougie IEX ; journal/executions.csv). Sélection IEX vérifiée sur DEV
+  (Sharpe 1,98 à 1 bp, +0,4 %/an à 3 bp). Ordres OTO stop testés sur le
+  compte paper (2 ordres test SPY/QQQ annulés, prix inatteignables).

@@ -38,6 +38,7 @@ from dotenv import load_dotenv
 import config
 import data
 import indicators as ind
+import live_sip
 import notifier
 import risk
 import strategy
@@ -140,27 +141,40 @@ def submit_bracket(trading_client, symbol: str, qty: int, sig: strategy.Signal):
     return trading_client.submit_order(order_data=req)
 
 
-def flatten(trading_client, symbols: set[str], reason: str, dry_run: bool):
-    """Annule les ordres ouverts et ferme les positions de CE bot uniquement."""
+def flatten(trading_client, symbols: set[str], reason: str, dry_run: bool, ref_prices: dict | None = None) -> dict:
+    """Annule TOUS les ordres ouverts des symboles de CE bot (y compris les
+    entrées pas encore déclenchées, qui sinon pourraient s'exécuter entre
+    15h50 et 16h00 et laisser une position la nuit), puis ferme ses positions.
+    Retourne {symbole: (sens de la sortie, prix de référence)} pour mesurer
+    le coût d'exécution des clôtures."""
     from alpaca.trading.enums import QueryOrderStatus
     from alpaca.trading.requests import GetOrdersRequest
+
+    closed = {}
+    if not dry_run and symbols:
+        try:
+            for o in trading_client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=sorted(symbols), nested=True, limit=500)):
+                trading_client.cancel_order_by_id(o.id)
+            time.sleep(2)  # laisse Alpaca libérer les actions réservées par les stops
+        except Exception as exc:  # noqa: BLE001
+            say(f"  ERREUR à l'annulation des ordres : {exc} -> vérifie le dashboard Alpaca !")
 
     positions = {p.symbol: p for p in trading_client.get_all_positions()}
     targets = [s for s in symbols if s in positions]
     if not targets:
         say(f"[sortie] {reason} : aucune position du bot à fermer.")
-        return
+        return closed
     for sym in targets:
         say(f"[sortie] {reason} : fermeture de {sym} ({positions[sym].qty} actions)")
         if dry_run:
             continue
         try:
-            for o in trading_client.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[sym], nested=True)):
-                trading_client.cancel_order_by_id(o.id)
-            time.sleep(1)  # laisse Alpaca libérer les actions réservées par le stop/objectif
             trading_client.close_position(sym)
+            side = "sell" if float(positions[sym].qty) > 0 else "buy"
+            closed[sym] = (side, (ref_prices or {}).get(sym) or float(positions[sym].current_price or 0))
         except Exception as exc:  # noqa: BLE001
             say(f"  ERREUR à la fermeture de {sym} : {exc} -> vérifie le dashboard Alpaca !")
+    return closed
 
 
 # ---------------------------------------------------------------- logique
@@ -310,16 +324,23 @@ def trade_until(trading_client, data_client, state: DayState, end: datetime, arg
         sleep_until_next_bar(end)
 
 
-def close_day(trading_client, state: DayState, args) -> str:
+def close_day(trading_client, data_client, state: DayState, args) -> str:
     wait = (state.flatten_at - datetime.now(timezone.utc)).total_seconds()
     if wait > 0:
         say(f"Attente de l'heure de fermeture ({int(wait // 60)} min)...")
         time.sleep(wait)
     bot_symbols = {o.symbol for o in bot_orders_today(trading_client, state.session_open)}
-    flatten(trading_client, bot_symbols, "fin de journée", args.dry_run)
-    time.sleep(5)
+    refs = live_sip.latest_prices(data_client, bot_symbols)
+    flatten_time = datetime.now(timezone.utc)
+    closed = flatten(trading_client, bot_symbols, "fin de journée", args.dry_run, refs)
+    time.sleep(10)
     say("")
     say(day_summary(trading_client, state))
+    if not args.dry_run:
+        try:
+            say(live_sip.record(live_sip.executions(trading_client, state.session_open, closed, flatten_time)))
+        except Exception as exc:  # noqa: BLE001
+            say(f"(mesure des coûts d'exécution impossible : {exc!r})")
     account = trading_client.get_account()
     equity, day_pnl = float(account.equity), float(account.equity) - float(account.last_equity)
     say(f"Équité finale : {equity:,.2f} $ (jour : {day_pnl:+,.2f} $)")
@@ -352,7 +373,7 @@ def run(args) -> str:
     if state is None:
         if args.phase == "close":
             # job du soir lancé trop tard (après la clôture) ou jour férié partiel
-            leftovers = [p.symbol for p in trading_client.get_all_positions() if p.symbol in config.WATCHLIST]
+            leftovers = [p.symbol for p in trading_client.get_all_positions()]
             if leftovers:
                 say(f"!! ALERTE : positions encore ouvertes après la clôture : {leftovers}. "
                     f"Vérifie le dashboard Alpaca (le bot ne peut plus fermer avant la prochaine ouverture).")
@@ -360,7 +381,13 @@ def run(args) -> str:
         return "MARCHÉ FERMÉ"
 
     if args.phase == "close":
-        return close_day(trading_client, state, args)
+        return close_day(trading_client, data_client, state, args)
+
+    if config.STRATEGY == "stocks_in_play":
+        live_sip.morning(trading_client, data_client, state, args, say)
+        if args.phase == "all" or state.flatten_at - datetime.now(timezone.utc) <= timedelta(hours=2):
+            return close_day(trading_client, data_client, state, args)
+        return "MATIN TERMINÉ"
 
     end = state.flatten_at
     if args.phase == "morning":
@@ -374,7 +401,7 @@ def run(args) -> str:
     if args.phase == "all" or half_day:
         if half_day and args.phase == "morning":
             say("Séance écourtée (jour férié partiel) : fermeture gérée par le job du matin.")
-        return close_day(trading_client, state, args)
+        return close_day(trading_client, data_client, state, args)
     say("Fin de la période d'entrées. Positions protégées par leurs stops ; fermeture par le job du soir.")
     return "MATIN TERMINÉ"
 
@@ -390,7 +417,17 @@ def main():
     p.add_argument("--once", action="store_true", help="une seule évaluation puis arrêt (test)")
     p.add_argument("--dry-run", action="store_true", help="n'envoie aucun ordre")
     p.add_argument("--phase", choices=["all", "morning", "close"], default="all")
+    p.add_argument("--replay", metavar="AAAA-MM-JJ", help="stocks in play : affiche la sélection qu'aurait faite le bot ce jour-là")
     args = p.parse_args()
+
+    if args.replay:
+        _, data_client = get_clients()
+        session_open = pd.Timestamp(f"{args.replay} {config.MARKET_OPEN}", tz=config.MARKET_TZ).to_pydatetime()
+        picks, n_feat, n_today = live_sip.scan(data_client, session_open)
+        print(f"{n_feat} actions avec historique, {n_today} avec 1re bougie IEX -> {len(picks)} sélectionnées")
+        for p_ in picks:
+            print(f"  {p_.symbol:<5} volume x{p_.relvol:4.1f} {p_.side:<4} niveau {p_.level:.2f} stop {p_.stop:.2f}")
+        return
 
     today = datetime.now(timezone.utc).date().isoformat()
     try:

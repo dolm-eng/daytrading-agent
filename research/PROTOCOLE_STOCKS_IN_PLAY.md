@@ -120,3 +120,25 @@ Ce qu'on apprend quand même :
 - Le HOLDOUT est maintenant consommé : toute nouvelle variante (ordres
   limites, stops plus larges...) ne pourra être validée que par du paper
   trading en temps réel.
+
+## Expérience de mesure en paper trading — décidée le 2026-10-09
+
+La stratégie n'est PAS validée (échec ci-dessus). Avec l'accord de
+l'utilisateur, elle remplace l'ORB dans le bot paper comme EXPÉRIENCE : son
+avantage avant frais est réel, et la seule inconnue décisive est le coût
+d'exécution réel, mesuré dans journal/executions.csv (seuil ~2,7 bp).
+
+Contrainte du plan gratuit Alpaca : à 9h35 la 1re bougie n'est disponible
+que sur le flux IEX. Vérification sur DEV uniquement (research/sip_iex.py),
+sélection IEX + exécution simulée en 1 min SIP :
+
+| Sélection | 1 bp | 3 bp |
+|---|---|---|
+| SIP (protocole) | +7,9 %/an, Sharpe 1,64 | -0,6 %/an |
+| IEX (live) | +9,6 %/an, Sharpe 1,98 | +0,4 %/an, Sharpe 0,12 |
+
+Recouvrement des sélections : 52 %, avantage brut conservé. Placer les
+ordres à 9h50 (pour avoir le SIP) détruit l'avantage (Sharpe 0,26 à 1 bp) :
+rejeté. Limite : le paper trading Alpaca sous-estime le glissement des
+ordres stop -> des coûts mesurés sous le seuil ne prouveront pas la
+rentabilité en argent réel.

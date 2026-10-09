@@ -54,3 +54,24 @@ SLIPPAGE_BPS = 2              # 0.02% par exécution au marché (actifs très li
 # positions d'un autre bot (ex: l'agent long terme) s'il partage le compte.
 ORDER_PREFIX = "dt"
 BAR_SETTLE_SECONDS = 20       # attente après la fin d'une bougie avant de la lire (le temps qu'elle soit publiée)
+
+# --- Stratégie active ---
+# "stocks_in_play" : scanne ~300 actions à 9h35 NY et trade la cassure sur les
+#                    20 plus "en jeu" (voir research/PROTOCOLE_STOCKS_IN_PLAY.md).
+#                    EXPÉRIENCE DE MESURE : stratégie NON validée (échec au
+#                    critère à 3 bp de frais) ; on mesure les vrais frais d'exécution.
+# "orb"            : cassure du range d'ouverture sur WATCHLIST (version d'origine).
+STRATEGY = "stocks_in_play"
+
+# --- Stocks in play ---
+SIP_UNIVERSE_FILE = "universe_sip.txt"   # 300 actions liquides, liste figée au 31/12/2024
+SIP_TOP_N = 20                 # nb d'actions tradées par jour (volume relatif le plus élevé)
+SIP_LOOKBACK = 14              # séances pour ATR, volume moyen, volume relatif
+SIP_MIN_RELVOL = 1.0           # 1re bougie au moins aussi active que d'habitude
+SIP_MIN_PRICE = 5.0
+SIP_MIN_AVG_VOLUME = 1_000_000
+SIP_MIN_ATR = 0.50
+SIP_STOP_ATR = 0.10            # stop à 10 % de l'ATR quotidien depuis l'entrée
+SIP_RISK_PCT = 0.005           # risque max par trade
+SIP_MAX_POSITION_FRACTION = 1 / 20   # montant max par position -> exposition totale <= 1x le capital
+SIP_BREAKEVEN_BPS = 2.7        # frais par exécution au-delà desquels le backtest devient perdant
