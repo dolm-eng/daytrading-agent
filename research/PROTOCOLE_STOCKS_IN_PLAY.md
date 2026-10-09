@@ -70,3 +70,25 @@ avec 3 points de base de coûts :
 - Sharpe > 0,5, ET
 - max drawdown < 15 %.
 Sinon, on le dit franchement et on garde l'existant.
+
+## Amendement n°1 — 2026-10-09 matin (AVANT tout résultat en 1 minute, HOLDOUT jamais regardé)
+
+**Constat** : le premier test DEV avec des bougies 5 min donne -85 % et 7,6 %
+de trades gagnants. Diagnostic sur 1 500 trades : le stop (10 % de l'ATR)
+est en médiane 2,6 fois plus petit que la bougie 5 min d'entrée, et 71 % des
+trades sont comptés « stoppés dans la bougie d'entrée » par la règle
+pessimiste, alors que le plus bas a souvent eu lieu AVANT l'entrée. Le
+résultat mesure donc un défaut de la simulation, pas la stratégie.
+L'article original simule l'exécution en bougies de 1 minute.
+
+**Changement de MÉTHODE (les règles de trading ne changent pas)** :
+- La sélection (volume relatif, ATR, filtres, top 20, sens) reste calculée
+  exactement comme avant (1re bougie 5 min + séances précédentes).
+- L'exécution (entrée, stop, sortie 15h50) est simulée sur des bougies de
+  1 MINUTE des actions sélectionnées.
+- Minute d'entrée : si le prix ouvre déjà au-delà du niveau (gap), entrée à
+  l'ouverture et le stop est vérifié sur le plus bas/haut de cette minute ;
+  sinon (le niveau est franchi pendant la minute), le stop n'est compté
+  dans cette minute que si elle CLÔTURE au-delà du stop. À partir de la
+  minute suivante : plus bas/haut comme avant (et ouverture si gap).
+- Critère de réussite, coûts, tailles et périodes : inchangés.
