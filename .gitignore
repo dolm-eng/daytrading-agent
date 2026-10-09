@@ -8,3 +8,5 @@ equity_curve.png
 trades.csv
 data_cache/
 research/*.out
+research/*.pkl
+research/*.log

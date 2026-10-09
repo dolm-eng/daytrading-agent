@@ -92,3 +92,31 @@ L'article original simule l'exécution en bougies de 1 minute.
   dans cette minute que si elle CLÔTURE au-delà du stop. À partir de la
   minute suivante : plus bas/haut comme avant (et ouverture si gap).
 - Critère de réussite, coûts, tailles et périodes : inchangés.
+
+## Résultats — 2026-10-09
+
+Exécution en bougies 1 min (amendement n°1), taille du protocole (levier <= 1x) :
+
+| Période | Coût / exécution | Rendement / an | Sharpe | Max DD | Trades |
+|---|---|---|---|---|---|
+| DEV 2020-10 -> 2024-12 | 1 bp | +7,9 % | 1,64 | 3,4 % | 17 359 |
+| DEV | **3 bp** | **-0,6 %** | -0,11 | 10,4 % | |
+| DEV | 5 bp | -8,5 % | -1,86 | 34,2 % | |
+| HOLDOUT 2025-01 -> 2026-10 | 1 bp | +6,8 % | 1,41 | 5,0 % | 7 102 |
+| HOLDOUT | **3 bp** | **-1,5 %** | **-0,31** | 7,0 % | |
+| HOLDOUT | 5 bp | -9,2 % | -2,02 | 16,0 % | |
+
+**Verdict selon le critère fixé à l'avance : ÉCHEC** (à 3 bp, rendement < 0
+et Sharpe < 0,5). La stratégie ne remplace pas l'ORB actuel.
+
+Ce qu'on apprend quand même :
+- L'avantage AVANT frais est réel et se maintient hors échantillon
+  (Sharpe ~1,4-1,6 à 1 bp sur les deux périodes).
+- Point mort : environ 2,6 à 2,9 bp de coût par exécution. Les stops très
+  serrés (10 % de l'ATR) et ~17 trades par jour rendent la stratégie
+  extrêmement sensible aux frais réels (écart achat/vente + glissement des
+  ordres stop), qui sur des actions « en jeu » à l'ouverture dépassent
+  vraisemblablement ce seuil.
+- Le HOLDOUT est maintenant consommé : toute nouvelle variante (ordres
+  limites, stops plus larges...) ne pourra être validée que par du paper
+  trading en temps réel.
