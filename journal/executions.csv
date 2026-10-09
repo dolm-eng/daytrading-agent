@@ -1,0 +1,5 @@
+date,symbole,type,sens,qty,reference,execution,cout_bp
+2026-10-09,CCI,cloture,sell,63.0,79.28,79.21,8.83
+2026-10-09,SBUX,cloture,buy,54.0,91.175,91.11,-7.13
+2026-10-09,SBUX,entree,sell,54.0,91.38,91.37,1.09
+2026-10-09,CCI,entree,buy,63.0,79.19,79.21,2.53
