@@ -330,6 +330,11 @@ def close_day(trading_client, data_client, state: DayState, args) -> str:
         say(f"Attente de l'heure de fermeture ({int(wait // 60)} min)...")
         time.sleep(wait)
     bot_symbols = {o.symbol for o in bot_orders_today(trading_client, state.session_open)}
+    if not args.dry_run and journal_has(state.session_open):
+        # un autre job de clôture est déjà passé : on revérifie juste qu'il ne reste rien
+        flatten(trading_client, bot_symbols, "fin de journée (vérification)", args.dry_run)
+        say("Séance déjà clôturée et enregistrée par un autre job : pas de doublon dans le journal.")
+        return "DÉJÀ CLÔTURÉE"
     refs = live_sip.latest_prices(data_client, bot_symbols)
     flatten_time = datetime.now(timezone.utc)
     closed = flatten(trading_client, bot_symbols, "fin de journée", args.dry_run, refs)
@@ -349,9 +354,21 @@ def close_day(trading_client, data_client, state: DayState, args) -> str:
     return "ARRÊT COUPE-CIRCUIT" if state.halted else "SÉANCE TERMINÉE"
 
 
+JOURNAL = Path(__file__).resolve().parent / "journal" / "journal.csv"
+
+
+def journal_has(session_open: datetime, path: Path | None = None) -> bool:
+    """Vrai si la séance de ce jour a déjà une ligne dans le journal."""
+    path = path or JOURNAL
+    if not path.exists():
+        return False
+    day = f"{session_open:%Y-%m-%d}"
+    return any(line.startswith(day + ",") for line in path.read_text(encoding="utf-8").splitlines())
+
+
 def write_journal(state: DayState, equity: float, day_pnl: float, symbols: list[str]) -> None:
     """Une ligne par séance dans journal/journal.csv (commité par GitHub Actions)."""
-    path = Path(__file__).resolve().parent / "journal" / "journal.csv"
+    path = JOURNAL
     path.parent.mkdir(exist_ok=True)
     new = not path.exists()
     with path.open("a", encoding="utf-8") as f:
@@ -384,10 +401,18 @@ def run(args) -> str:
         return close_day(trading_client, data_client, state, args)
 
     if config.STRATEGY == "stocks_in_play":
-        live_sip.morning(trading_client, data_client, state, args, say)
-        if args.phase == "all" or state.flatten_at - datetime.now(timezone.utc) <= timedelta(hours=2):
+        # séance écourtée (veille de fête) : la clôture tombe avant le job du soir
+        half_day = state.flatten_at - state.session_open < timedelta(hours=5)
+        if not args.dry_run and bot_orders_today(trading_client, state.session_open):
+            # le job a été lancé deux fois (déclencheur externe + planning GitHub)
+            say("Ordres du matin déjà envoyés aujourd'hui par un autre job : rien à faire.")
+            if args.phase == "all":
+                return close_day(trading_client, data_client, state, args)
+            return "MATIN DÉJÀ FAIT"
+        result = live_sip.morning(trading_client, data_client, state, args, say)
+        if args.phase == "all" or half_day:
             return close_day(trading_client, data_client, state, args)
-        return "MATIN TERMINÉ"
+        return "MATIN ANNULÉ (RETARD)" if result == "TROP TARD" else "MATIN TERMINÉ"
 
     end = state.flatten_at
     if args.phase == "morning":
@@ -436,7 +461,7 @@ def main():
         say(f"Le bot a planté : {exc!r}")
         notifier.send_email(f"[Day Trading Bot] {today} — ERREUR", "\n".join(LOG))
         raise
-    if not args.once and status != "MATIN TERMINÉ":
+    if not args.once and status not in ("MATIN TERMINÉ", "MATIN DÉJÀ FAIT", "DÉJÀ CLÔTURÉE"):
         notifier.send_email(f"[Day Trading Bot] {today} — {status}", "\n".join(LOG))
 
 

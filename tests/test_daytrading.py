@@ -225,7 +225,7 @@ def test_sip_morning_sends_oto_stop_orders(monkeypatch):
     monkeypatch.setattr(sip, "select", lambda f, t, h: picks)
     tc = FakeSipTrading()
     state = _state()
-    state.session_open = pd.Timestamp.now(tz="UTC").to_pydatetime() - pd.Timedelta(minutes=10)
+    state.session_open = pd.Timestamp.now(tz="UTC").to_pydatetime() - pd.Timedelta(minutes=6)  # ~9h36 NY
     live_sip.morning(tc, None, state, SimpleNamespace(dry_run=False), lambda s: None)
     assert len(tc.submitted) == 2
     buy, sell = tc.submitted
@@ -249,3 +249,42 @@ def test_flatten_cancels_unfilled_entries_too(monkeypatch):
     tc = TC()  # aucune position : l'ordre d'entrée non déclenché doit quand même être annulé
     live_daytrade.flatten(tc, {"AAA"}, "test", dry_run=False)
     assert cancelled == ["entry-not-triggered"]
+
+
+# --- Protection contre les jobs lancés en retard ou en double ---
+
+import live_sip  # noqa: E402
+
+
+def test_morning_too_late_after_limit():
+    open_ = pd.Timestamp("2026-10-13 09:30", tz=config.MARKET_TZ).to_pydatetime()
+    on_time = open_ + pd.Timedelta(minutes=6)        # envoi normal vers 9h36
+    late = open_ + pd.Timedelta(hours=6, minutes=23)  # job parti à 15h53 NY
+    assert not live_sip.morning_too_late(on_time, open_)
+    assert live_sip.morning_too_late(late, open_)
+    assert live_sip.morning_too_late(open_ + pd.Timedelta(minutes=config.MORNING_MAX_DELAY_MINUTES, seconds=1), open_)
+
+
+def test_journal_has_detects_existing_session(tmp_path):
+    path = tmp_path / "journal.csv"
+    open_ = pd.Timestamp("2026-10-13 09:30", tz=config.MARKET_TZ).to_pydatetime()
+    assert not live_daytrade.journal_has(open_, path)
+    path.write_text("date,equite,pnl_jour,symboles_trades\n2026-10-09,100014.04,14.04,CCI\n", encoding="utf-8")
+    assert not live_daytrade.journal_has(open_, path)
+    with path.open("a", encoding="utf-8") as f:
+        f.write("2026-10-13,100013.82,0.00,JPM\n")
+    assert live_daytrade.journal_has(open_, path)
+
+
+def test_sip_morning_sends_nothing_when_job_started_late(monkeypatch):
+    """Cas du 13/10/2026 : job du matin parti à 15h53 NY -> aucun ordre."""
+    picks = [sip.Pick("AAA", "buy", 50.0, 49.8, 2.0, 4.0)]
+    monkeypatch.setattr(live_sip, "daily_features", lambda dc, syms, so: (pd.DataFrame(), []))
+    monkeypatch.setattr(live_sip, "first_volume_history", lambda dc, syms, dates: pd.DataFrame())
+    monkeypatch.setattr(live_sip, "first_bars", lambda dc, syms, day_open: pd.DataFrame())
+    monkeypatch.setattr(sip, "select", lambda f, t, h: picks)
+    tc = FakeSipTrading()
+    state = _state()
+    state.session_open = pd.Timestamp.now(tz="UTC").to_pydatetime() - pd.Timedelta(hours=6, minutes=23)
+    result = live_sip.morning(tc, None, state, SimpleNamespace(dry_run=False), lambda s: None)
+    assert result == "TROP TARD" and tc.submitted == []

@@ -1,10 +1,17 @@
 name: Day trading (paper)
 
-# Heures en UTC. Elles marchent été comme hiver : le bot attend lui-même
-# l'ouverture et l'heure de fermeture grâce à l'horloge du marché d'Alpaca.
-#   matin : 13h20 UTC -> attend l'ouverture (9h30 NY), trade jusqu'à 11h35 NY
-#   soir  : 19h07 UTC -> attend 15h50 NY, ferme tout, envoie le bilan
-# Un job GitHub est limité à 6 h, d'où ce découpage en deux.
+# DÉCLENCHEMENT
+# Le planning de GitHub (schedule) peut partir avec des HEURES de retard : le
+# 12 et le 13/10/2026, le job du matin est parti après la clôture. Le vrai
+# déclencheur est donc externe (cron-job.org, heure de New York) qui appelle
+# l'API "workflow_dispatch" pile à l'heure :
+#   matin : 9h15 NY  -> inputs {"phase": "morning", "dry_run": "false"}
+#   soir  : 15h30 NY -> inputs {"phase": "close",   "dry_run": "false"}
+# Les crons GitHub ci-dessous restent en SECOURS (surtout pour fermer les
+# positions le soir). Les doublons sont sans danger : les deux jobs d'une
+# même phase ne tournent jamais en même temps (concurrency), le 2e voit que
+# les ordres du matin / la clôture du soir sont déjà faits et ne refait rien,
+# et le bot n'envoie aucun ordre d'entrée après 9h40 NY.
 on:
   schedule:
     - cron: "20 13 * * 1-5"
@@ -22,7 +29,8 @@ permissions:
   contents: write   # pour enregistrer journal/journal.csv
 
 concurrency:
-  group: daytrade-${{ github.event.schedule || inputs.phase }}
+  # même groupe pour un job de la même phase, qu'il vienne de GitHub ou de cron-job.org
+  group: daytrade-${{ inputs.phase || (github.event.schedule == '20 13 * * 1-5' && 'morning' || 'close') }}
   cancel-in-progress: false
 
 jobs:
@@ -31,6 +39,8 @@ jobs:
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main   # dernière version, avec le journal écrit par un job précédent du jour
 
       - uses: actions/setup-python@v5
         with:

@@ -52,6 +52,13 @@ illimitées) : job `morning` (13h20 UTC -> fin des entrées) + job `close`
 (19h07 UTC -> flatten 15h50 NY + email + commit de `journal/journal.csv`).
 La tâche planifiée Windows locale ne doit PAS tourner en même temps.
 
+2026-10-14 : le planning GitHub partait avec des heures de retard (12 et
+13/10 : job du matin après la clôture). Déclencheur principal = cron-job.org
+(heure de NY : 9h15 morning, 15h30 close) via l'API workflow_dispatch ; les
+crons GitHub restent en secours. Garde-fous : aucun ordre d'entrée après
+`MORNING_MAX_DELAY_MINUTES` (9h40 NY), matin ignoré si des ordres `dt-` existent
+déjà, clôture ignorée si le journal a déjà la ligne du jour (checkout `ref: main`).
+
 ## Recherche (research/)
 
 Protocole : DEV 2020-10 -> 2024-12, HOLDOUT 2025-01 -> 2026-10 (déjà

@@ -112,7 +112,14 @@ def submit_entry(trading_client, pick: sip.Pick, qty: int):
     ))
 
 
-def morning(trading_client, data_client, state, args, say) -> None:
+def morning_too_late(now: datetime, session_open: datetime) -> bool:
+    """Vrai si on a dépassé l'heure limite d'envoi des ordres du matin.
+    Les niveaux d'entrée viennent de la 1re bougie (9h30-9h35) : envoyés
+    des heures plus tard (job GitHub lancé en retard), ils sont périmés."""
+    return now > session_open + timedelta(minutes=config.MORNING_MAX_DELAY_MINUTES)
+
+
+def morning(trading_client, data_client, state, args, say) -> str | None:
     """Scan à 9h35 NY puis envoi des ordres. Ne surveille rien ensuite :
     entrées et stops sont gérés par Alpaca."""
     import time
@@ -140,6 +147,12 @@ def morning(trading_client, data_client, state, args, say) -> None:
     today = first_bars(data_client, symbols, pd.Timestamp(state.session_open).tz_convert(NY))
     picks = sip.select(features, today, hist)
     say(f"{len(features)} actions avec historique, {len(today)} avec une 1re bougie IEX -> {len(picks)} sélectionnées.")
+
+    if morning_too_late(datetime.now(timezone.utc), state.session_open):
+        limit = pd.Timestamp(state.session_open).tz_convert(NY) + pd.Timedelta(minutes=config.MORNING_MAX_DELAY_MINUTES)
+        say(f"TROP TARD : il est plus de {limit:%H:%M} NY, les niveaux de la 1re bougie sont périmés. "
+            f"Aucun ordre envoyé aujourd'hui (le job a sans doute démarré en retard).")
+        return "TROP TARD"
 
     equity = float(trading_client.get_account().equity)
     held = {p.symbol for p in trading_client.get_all_positions()}

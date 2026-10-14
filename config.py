@@ -54,6 +54,7 @@ SLIPPAGE_BPS = 2              # 0.02% par exécution au marché (actifs très li
 # positions d'un autre bot (ex: l'agent long terme) s'il partage le compte.
 ORDER_PREFIX = "dt"
 BAR_SETTLE_SECONDS = 20       # attente après la fin d'une bougie avant de la lire (le temps qu'elle soit publiée)
+MORNING_MAX_DELAY_MINUTES = 10  # stocks in play : aucun ordre d'entrée envoyé après 9h40 NY (niveaux périmés)
 
 # --- Stratégie active ---
 # "stocks_in_play" : scanne ~300 actions à 9h35 NY et trade la cassure sur les
