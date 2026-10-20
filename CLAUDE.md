@@ -59,6 +59,11 @@ crons GitHub restent en secours. Garde-fous : aucun ordre d'entrée après
 `MORNING_MAX_DELAY_MINUTES` (9h40 NY), matin ignoré si des ordres `dt-` existent
 déjà, clôture ignorée si le journal a déjà la ligne du jour (checkout `ref: main`).
 
+2026-10-20 : le job du matin lancé à 9h15 NY plantait chaque jour depuis le
+15/10 : l'historique SIP était demandé jusqu'à 9h29, or le plan gratuit
+refuse les 15 dernières minutes SIP. `live_sip.sip_history_end` borne la
+requête à maintenant - 16 min (les jobs lancés tard ne voyaient pas le bug).
+
 ## Recherche (research/)
 
 Protocole : DEV 2020-10 -> 2024-12, HOLDOUT 2025-01 -> 2026-10 (déjà

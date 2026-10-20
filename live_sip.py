@@ -48,11 +48,23 @@ def _bars(data_client, symbols, start, end, timeframe_minutes: int, feed: str) -
     return df.rename(columns={c.lower(): c for c in data.COLS})[data.COLS]
 
 
+SIP_DELAY_MINUTES = 16  # plan gratuit Alpaca : pas de données SIP des 15 dernières minutes
+
+
+def sip_history_end(session_open: datetime, now: datetime | None = None) -> datetime:
+    """Fin de la fenêtre d'historique SIP. Le job du matin démarre vers 9h15 NY :
+    demander des bougies SIP jusqu'à 9h29 ferait refuser la requête par Alpaca
+    (« subscription does not permit querying recent SIP data »). Les séances
+    passées se terminent la veille à 16h, donc rien n'est perdu en reculant."""
+    now = now or datetime.now(timezone.utc)
+    return min(session_open - timedelta(minutes=1), now - timedelta(minutes=SIP_DELAY_MINUTES))
+
+
 def daily_features(data_client, symbols, session_open: datetime) -> tuple[pd.DataFrame, list]:
     """ATR, volume moyen et clôture de la veille, calculés comme dans le
     backtest : à partir des bougies 5 min SIP des heures de marché des
     séances précédentes. Retourne aussi la liste des dates de ces séances."""
-    df = _bars(data_client, symbols, session_open - timedelta(days=40), session_open - timedelta(minutes=1), 5, "sip")
+    df = _bars(data_client, symbols, session_open - timedelta(days=40), sip_history_end(session_open), 5, "sip")
     rows = []
     for sym, d in df.groupby(level=0):
         d = data.regular_hours(d.xs(sym, level=0))

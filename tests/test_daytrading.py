@@ -288,3 +288,19 @@ def test_sip_morning_sends_nothing_when_job_started_late(monkeypatch):
     state.session_open = pd.Timestamp.now(tz="UTC").to_pydatetime() - pd.Timedelta(hours=6, minutes=23)
     result = live_sip.morning(tc, None, state, SimpleNamespace(dry_run=False), lambda s: None)
     assert result == "TROP TARD" and tc.submitted == []
+
+
+def test_sip_history_end_respects_15_min_delay():
+    """Job du matin lancé à 9h15 NY : la requête SIP ne doit pas viser les
+    15 dernières minutes (refusée par le plan gratuit Alpaca)."""
+    from datetime import datetime, timedelta, timezone
+
+    import live_sip
+
+    session_open = datetime(2026, 10, 20, 13, 30, tzinfo=timezone.utc)  # 9h30 NY
+    now = datetime(2026, 10, 20, 13, 15, tzinfo=timezone.utc)  # 9h15 NY
+    end = live_sip.sip_history_end(session_open, now)
+    assert end <= now - timedelta(minutes=15)
+    # lancé tard : on garde la borne habituelle (juste avant l'ouverture)
+    late = datetime(2026, 10, 20, 15, 0, tzinfo=timezone.utc)
+    assert live_sip.sip_history_end(session_open, late) == session_open - timedelta(minutes=1)
