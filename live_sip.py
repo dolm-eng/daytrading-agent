@@ -131,7 +131,18 @@ def morning_too_late(now: datetime, session_open: datetime) -> bool:
     return now > session_open + timedelta(minutes=config.MORNING_MAX_DELAY_MINUTES)
 
 
-def morning(trading_client, data_client, state, args, say) -> str | None:
+def prepare(data_client, session_open: datetime, say) -> dict:
+    """Données qui ne dépendent pas de la séance du jour (ATR, volumes,
+    historique IEX de la 1re bougie). Peut tourner AVANT l'ouverture."""
+    symbols = sip.load_universe()
+    say(f"Préparation des données de {len(symbols)} actions...")
+    features, dates = daily_features(data_client, symbols, session_open)
+    hist = first_volume_history(data_client, symbols, dates)
+    say(f"Données prêtes ({len(features)} actions avec historique).")
+    return {"session_open": pd.Timestamp(session_open), "symbols": symbols, "features": features, "hist": hist}
+
+
+def morning(trading_client, data_client, state, args, say, prepared: dict | None = None) -> str | None:
     """Scan à 9h35 NY puis envoi des ordres. Ne surveille rien ensuite :
     entrées et stops sont gérés par Alpaca."""
     import time
@@ -145,13 +156,12 @@ def morning(trading_client, data_client, state, args, say) -> str | None:
         return
 
     # préparation AVANT 9h35 (ATR, volumes, historique IEX) pour envoyer les ordres sans délai
-    symbols = sip.load_universe()
-    say(f"Préparation des données de {len(symbols)} actions...")
-    features, dates = daily_features(data_client, symbols, state.session_open)
-    hist = first_volume_history(data_client, symbols, dates)
+    if not prepared or prepared["session_open"] != pd.Timestamp(state.session_open):
+        prepared = prepare(data_client, state.session_open, say)
+    symbols, features, hist = prepared["symbols"], prepared["features"], prepared["hist"]
 
     scan_at = pd.Timestamp(state.session_open) + pd.Timedelta(minutes=5, seconds=config.BAR_SETTLE_SECONDS)
-    wait = (scan_at - pd.Timestamp.now(tz="UTC")).total_seconds()
+    wait = (scan_at - pd.Timestamp(datetime.now(timezone.utc))).total_seconds()
     if wait > 0:
         say(f"Attente de la fin de la 1re bougie (9h35 NY) : {int(wait)} s...")
         time.sleep(wait)

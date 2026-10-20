@@ -63,6 +63,11 @@ déjà, clôture ignorée si le journal a déjà la ligne du jour (checkout `ref
 15/10 : l'historique SIP était demandé jusqu'à 9h29, or le plan gratuit
 refuse les 15 dernières minutes SIP. `live_sip.sip_history_end` borne la
 requête à maintenant - 16 min (les jobs lancés tard ne voyaient pas le bug).
+L'historique (ATR, volumes, ~4 min 30 pour 300 actions) est désormais chargé
+PENDANT l'attente de l'ouverture (`live_sip.prepare`), pour que les ordres
+partent à 9h35:20 et non vers 9h36-9h37 (limite 9h40).
+`tests/test_morning_rehearsal.py` rejoue tout le matin (horloge simulée, faux
+Alpaca qui refuse le SIP récent) pour des départs à 9h00/9h15/9h25/9h31/9h36/9h45.
 
 ## Recherche (research/)
 

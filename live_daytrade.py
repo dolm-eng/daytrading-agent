@@ -386,6 +386,16 @@ def run(args) -> str:
     (GitHub Actions limite un job à 6 h, d'où le découpage matin / soir.)
     """
     trading_client, data_client = get_clients()
+    prepared = None
+    if config.STRATEGY == "stocks_in_play" and args.phase in ("morning", "all"):
+        # job lancé avant l'ouverture (9h15 NY) : on charge l'historique PENDANT
+        # l'attente, pour envoyer les ordres dès 9h35 (limite 9h40)
+        clock = trading_client.get_clock()
+        if not clock.is_open and clock.next_open - clock.timestamp <= MAX_WAIT_FOR_OPEN:
+            try:
+                prepared = live_sip.prepare(data_client, clock.next_open, say)
+            except Exception as exc:  # noqa: BLE001
+                say(f"Préparation anticipée impossible ({exc!r}) : nouvel essai après l'ouverture.")
     state = open_session(trading_client, args)
     if state is None:
         if args.phase == "close":
@@ -409,7 +419,7 @@ def run(args) -> str:
             if args.phase == "all":
                 return close_day(trading_client, data_client, state, args)
             return "MATIN DÉJÀ FAIT"
-        result = live_sip.morning(trading_client, data_client, state, args, say)
+        result = live_sip.morning(trading_client, data_client, state, args, say, prepared)
         if args.phase == "all" or half_day:
             return close_day(trading_client, data_client, state, args)
         return "MATIN ANNULÉ (RETARD)" if result == "TROP TARD" else "MATIN TERMINÉ"
