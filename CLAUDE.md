@@ -88,3 +88,16 @@ le seul test propre restant.
   bougie IEX ; journal/executions.csv). Sélection IEX vérifiée sur DEV
   (Sharpe 1,98 à 1 bp, +0,4 %/an à 3 bp). Ordres OTO stop testés sur le
   compte paper (2 ordres test SPY/QQQ annulés, prix inatteignables).
+
+## Skills day-trader (.claude/skills/)
+
+2026-10-21 : ajout des 11 skills de github.com/Jakeschincariol/day-trader-skill
+(MIT, voir `.claude/skills/LICENSE-day-trader-skill`) : trader-scanner, -news,
+-entry, -exit, -timemachine, -risk, -budget, -broker, -alerts, -analyst,
+-pelosi. Outils d'AIDE à l'analyse en session Claude Code (données publiques
+Yahoo/SEC/Nasdaq, Python stdlib), indépendants du bot : ils ne modifient ni
+`strategy.py` ni `live_sip.py`. Ils écrivent dans `trader/` (ignoré par Git :
+contient le nom/email SEC_USER_AGENT — dépôt public). `/trader-broker` reste en
+paper et n'envoie jamais d'ordre sans "oui" explicite ; ne jamais passer
+l'outil d'ordre Alpaca en "Always allow". Usage utile ici :
+`/trader-timemachine` pour tester une idée avant de la coder dans le bot.

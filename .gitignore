@@ -10,3 +10,6 @@ data_cache/
 research/*.out
 research/*.pkl
 research/*.log
+
+# Skills day-trader (.claude/skills) : état et config locale (nom/email SEC)
+trader/
